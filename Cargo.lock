@@ -41,12 +41,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hex-slice"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5491a308e0214554f07a81d8944abe45f552871c12e3c3c6e7e5d354039a6c4c"
-
-[[package]]
 name = "libc"
 version = "0.2.159"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -54,9 +48,8 @@ checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
 
 [[package]]
 name = "ord-uuid"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
- "hex-slice",
  "rand",
  "uuid",
 ]
