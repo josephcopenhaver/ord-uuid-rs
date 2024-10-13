@@ -44,7 +44,7 @@ mod test_ord_uuid_x_as_u128 {
 
 impl Display for OrdUuid {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "0x{:032x}", self.as_u128())
+        write!(f, "{:032x}", self.as_u128())
     }
 }
 
@@ -56,7 +56,7 @@ mod test_ord_uuid_x_fmt {
     fn unique_nib_pairs() {
         let input = 0x112233445566778899AABBCCDDEEFFE5;
         let actual = format!("{}", OrdUuid(u128_to_bytes(input)));
-        let expected = "0x112233445566778899aabbccddeeffe5";
+        let expected = "112233445566778899aabbccddeeffe5";
         assert_eq!(actual, expected);
     }
 
@@ -64,7 +64,7 @@ mod test_ord_uuid_x_fmt {
     fn leading_zero() {
         let input = 0x012233445566778899AABBCCDDEEFFE5;
         let actual = format!("{}", OrdUuid(u128_to_bytes(input)));
-        let expected = "0x012233445566778899aabbccddeeffe5";
+        let expected = "012233445566778899aabbccddeeffe5";
         assert_eq!(actual, expected);
     }
 }
