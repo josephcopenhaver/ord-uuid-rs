@@ -69,7 +69,7 @@ mod test_ord_uuid_x_fmt {
     }
 }
 
-struct OrdUuidGen {
+pub struct OrdUuidGen {
     rng: StdRng,
     ctx: Context,
     node: [u8; NUM_NODE_BYTES],
