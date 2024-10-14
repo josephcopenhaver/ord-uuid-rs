@@ -6,11 +6,16 @@ use uuid::{Context, Timestamp, Uuid};
 const NUM_BYTES: usize = 16;
 const NUM_NODE_BYTES: usize = 6;
 
+//
+// some inspiration was taken from the following blog post
+// https://www.percona.com/blog/store-uuid-optimized-way/
+//
+
 pub struct OrdUuid([u8; NUM_BYTES]);
 
 impl OrdUuid {
     fn as_u128(&self) -> u128 {
-        return ((self.0[0] as u128) << 120)
+        ((self.0[0] as u128) << 120)
             | ((self.0[1] as u128) << 112)
             | ((self.0[2] as u128) << 104)
             | ((self.0[3] as u128) << 96)
@@ -25,7 +30,11 @@ impl OrdUuid {
             | ((self.0[12] as u128) << 24)
             | ((self.0[13] as u128) << 16)
             | ((self.0[14] as u128) << 8)
-            | self.0[15] as u128;
+            | self.0[15] as u128
+    }
+
+    pub fn as_bytes(&self) -> [u8; NUM_BYTES] {
+        self.0
     }
 }
 
@@ -39,6 +48,23 @@ mod test_ord_uuid_x_as_u128 {
         let actual = OrdUuid(u128_to_bytes(input)).as_u128();
         let expected = input;
         assert_eq!(actual, expected);
+    }
+}
+
+#[cfg(test)]
+mod test_ord_uuid_x_as_bytes {
+    use std::any::Any;
+
+    use super::*;
+
+    #[test]
+    fn unique_nib_pairs() {
+        let input = 0x112233445566778899AABBCCDDEEFFE5;
+        let input = OrdUuid(u128_to_bytes(input));
+        let dst = input.as_bytes();
+        let src = &input.0;
+        assert_eq!(src, &dst);
+        assert_ne!(src as *const dyn Any, &dst as *const dyn Any);
     }
 }
 
@@ -100,7 +126,12 @@ fn order_bits_lexically_for_v1(v: u128) -> u128 {
     // preserve node bits with multicast bit moved to end
     | ((v & (0xFE << 40)) << 6)
     | ((v & 0xFFFFFFFFFF) << 7)
-    | ((v & (1 << 40)) >> 34)
+    // | ((v & (1 << 40)) >> 34)
+    // not using the above as this is for v1
+    // and it should be using a mac address
+    // but RFC 4122 says this bit should be set
+    // if not using a mac address and we're definitely not
+    | 0x40
     //
     // move two variant bits
     // 0x0000000000000000C000
@@ -310,12 +341,7 @@ impl OrdUuidGen {
 
         let ts = Timestamp::now(&self.ctx);
 
-        let mut node = self.node;
-
-        // set the multicast bit as uuid is not based on mac address as required by the RFC 4122
-        node[0] |= 1;
-
-        let v = Uuid::new_v1(ts, &node).as_u128();
+        let v = Uuid::new_v1(ts, &self.node).as_u128();
 
         let v = order_bits_lexically_for_v1(v);
 
@@ -333,7 +359,7 @@ impl OrdUuidGen {
         // these last seven bits could be reclaimed and used for another purpose
         // however that purpose should likely not be to increase the number of
         // bits used to ensure uniqueness of a uuid node or randomness if the goal
-        // is to simply reorder the bits and remain v1 compatible
+        // is to simply reorder the bits and remain v1 compatible with simple bit shifts
 
         OrdUuid(u128_to_bytes(v))
     }
@@ -359,7 +385,7 @@ impl OrdUuidGen {
         // these last six bits could be reclaimed and used for another purpose
         // however that purpose should likely not be to increase the number of
         // bits used to ensure uniqueness of a uuid node or randomness if the goal
-        // is to simply reorder the bits and remain v4 compatible
+        // is to simply reorder the bits and remain v4 compatible with simple bit shifts
 
         OrdUuid(u128_to_bytes(v))
     }
@@ -422,7 +448,7 @@ pub fn new_v4(rng: &mut StdRng) -> OrdUuid {
     // these last six bits could be reclaimed and used for another purpose
     // however that purpose should likely not be to increase the number of
     // bits used to ensure uniqueness of a uuid node or randomness if the goal
-    // is to simply reorder the bits and remain v1 compatible
+    // is to simply reorder the bits and remain v1 compatible with simple bit shifts
 
     OrdUuid(bytes)
 }
