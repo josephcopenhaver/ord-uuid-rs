@@ -100,7 +100,6 @@ mod test_ord_uuid_x_fmt {
 }
 
 pub struct OrdUuidGen {
-    rng: StdRng,
     ctx: Context,
     node: [u8; NUM_NODE_BYTES],
 }
@@ -398,7 +397,6 @@ impl OrdUuidGen {
         rng.fill_bytes(&mut node);
 
         OrdUuidGen {
-            rng: rng,
             ctx: Context::new(seed),
             node: node,
         }
