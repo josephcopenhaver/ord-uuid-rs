@@ -258,12 +258,12 @@ fn order_bits_lexically_for_ord_v(v: u128, version_bits: OrdVersionBits) -> u128
     (v & (0xFFFFFFFFFFFF << 80))
     // 0xFFFFFFFFFFFF00000000
     //
-    // move time low nibs
+    // move after version - before variant bits
     // 0x0000000000000FFF0000
     | ((v & (0xFFF << 64)) << 4)
     // 0xFFFFFFFFFFFFFFF00000
     //
-    // move clock seq nibs and node bits
+    // move after variant bits (including node bits)
     // 0x00000000000000003FFF
     | ((v & 0x3FFF_FFFFFFFFFFFF) << 6)
     //
