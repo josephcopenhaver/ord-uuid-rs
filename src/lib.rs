@@ -482,7 +482,7 @@ impl OrdUuidGen {
         OrdUuid(u128_to_bytes(v))
     }
 
-    pub fn new_v7(&mut self) -> OrdUuid {
+    pub fn new_v7(&self) -> OrdUuid {
         // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-01.html#name-uuidv6-layout-and-bit-order
 
         let ts = Timestamp::now(&self.ctx);
@@ -561,7 +561,7 @@ mod test_ord_uuid_gen {
     #[test]
     fn new_v7() {
         let mask = 0x3F;
-        let mut oug = OrdUuidGen::new();
+        let oug = OrdUuidGen::new();
         let v = oug.new_v7().as_u128() & mask;
         assert_eq!(0b10_0111, 0x27);
         assert_eq!(v, 0x27);
