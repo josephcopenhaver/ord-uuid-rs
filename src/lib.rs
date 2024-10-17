@@ -6,6 +6,10 @@ use uuid::{Context, Timestamp, Uuid};
 const NUM_BYTES: usize = 16;
 const NUM_NODE_BYTES: usize = 6;
 
+type OrdVersionBits = u8;
+const ORD_VERSION_BITS6: OrdVersionBits = 6;
+const ORD_VERSION_BITS7: OrdVersionBits = 7;
+
 //
 // some inspiration was taken from the following blog post
 // https://www.percona.com/blog/store-uuid-optimized-way/
@@ -131,15 +135,14 @@ fn order_bits_lexically_for_v1(v: u128) -> u128 {
     // and it should be using a mac address
     // but RFC 4122 says this bit should be set
     // if not using a mac address and we're definitely not
-    | 0x40
     //
-    // move two variant bits
-    // 0x0000000000000000C000
-    | ((v & (3 << 62)) >> 58) // shift all the way to the right, but leave a nib of space for version
     //
-    // move version nib
-    // 0x000000000000F0000000
-    | ((v & (0xF << 76)) >> 76)
+    // | 0x40
+    // | 0x21
+    // combining the above as well into `0x61`
+    //
+    // set variant and version bits
+    | 0x61
 }
 
 #[cfg(test)]
@@ -167,7 +170,7 @@ mod test_order_bits_lexically_for_v1 {
 
     #[test]
     fn returns_unique_nib_pairs() {
-        let expected = 0x112233445566778899aabbccddeeffe5 as u128;
+        let expected = 0x112233445566778899aabbccddeeffe1 as u128;
         let input = undo_order_bits_lexically_for_v1(expected);
         let actual = order_bits_lexically_for_v1(input);
         assert_eq!(actual, expected);
@@ -175,10 +178,10 @@ mod test_order_bits_lexically_for_v1 {
 
     #[test]
     fn unique_nib_pairs() {
-        let input = 0x112233445566778899AABBCCDDEEFFe5;
+        let input = 0x1122334455661788D9AABBCCDDEEFFe5;
         let actual = order_bits_lexically_for_v1(input);
-        let expected = 0x78855661122334466aaee66ef77ff2e7 as u128;
-        assert_eq!(actual, expected);
+        let expected = 0x78855661122334466aaee66ef77ff2e1 as u128;
+        assert_eq!(format!("{:x}", actual), format!("{:x}", expected));
     }
 }
 
@@ -207,13 +210,8 @@ fn order_bits_lexically_for_v4(v: u128) -> u128 {
     // preserve node bits
     | ((v & 0xFFFFFFFFFFFF) << 6)
     //
-    // move two variant bits
-    // 0x0000000000000000C000
-    | ((v & (3 << 62)) >> 58) // shift all the way to the right, but leave a nib of space for version
-    //
-    // move version nib
-    // 0x000000000000F0000000
-    | ((v & (0xF << 76)) >> 76)
+    // set variant and version bits
+    | 0x24
 }
 
 #[cfg(test)]
@@ -239,7 +237,7 @@ mod test_order_bits_lexically_for_v4 {
 
     #[test]
     fn returns_unique_nib_pairs() {
-        let expected = 0x112233445566778899aabbccddeeffe5 as u128;
+        let expected = 0x112233445566778899aabbccddeeffe4 as u128;
         let input = undo_order_bits_lexically_for_v4(expected);
         let actual = order_bits_lexically_for_v4(input);
         assert_eq!(actual, expected);
@@ -247,9 +245,79 @@ mod test_order_bits_lexically_for_v4 {
 
     #[test]
     fn unique_nib_pairs() {
-        let input = 0x112233445566778899AABBCCDDEEFFe5;
+        let input = 0x1122334455664788D9AABBCCDDEEFFe5;
         let actual = order_bits_lexically_for_v4(input);
-        let expected = 0x78855661122334466aaef3377bbff967 as u128;
+        let expected = 0x78855661122334466aaef3377bbff964 as u128;
+        assert_eq!(actual, expected);
+    }
+}
+
+fn order_bits_lexically_for_ord_v(v: u128, version_bits: OrdVersionBits) -> u128 {
+    //
+    // preserve before version bits
+    // 0xFFFFFFFFFFFF00000000
+    (v & (0xFFFFFFFFFFFF << 80))
+    // 0xFFFFFFFFFFFF00000000
+    //
+    // move time low nibs
+    // 0x0000000000000FFF0000
+    | ((v & (0xFFF << 64)) << 4)
+    // 0xFFFFFFFFFFFFFFF00000
+    //
+    // move clock seq nibs and node bits
+    // 0x00000000000000003FFF
+    | ((v & 0x3FFF_FFFFFFFFFFFF) << 6)
+    //
+    // set variant and version bits
+    | 0x20 | (version_bits as u128)
+}
+
+#[cfg(test)]
+mod test_order_bits_lexically_for_ord_v {
+    use super::*;
+
+    fn undo_order_bits_lexically_for_ord_v(v: u128, version_bits: OrdVersionBits) -> u128 {
+        // time high
+        (v & (0xFFFFFFFFFFFF << 80))
+        // time low
+        | ((v >> 4) & (0xFFF << 64))
+        // clock seq and node bits
+        | ((v >> 6) & 0x3FFFFFFFFFFFFFFF)
+        // variant
+        | ((v << 58) & (0xC << 60))
+        // version
+        | ((version_bits as u128) << 76)
+    }
+
+    #[test]
+    fn returns_unique_nib_pairs_v6() {
+        let expected = 0x112233445566778899aabbccddeeffe6 as u128;
+        let input = undo_order_bits_lexically_for_ord_v(expected, ORD_VERSION_BITS6);
+        let actual = order_bits_lexically_for_ord_v(input, ORD_VERSION_BITS6);
+        assert_eq!(format!("{:x}", actual), format!("{:x}", expected));
+    }
+
+    #[test]
+    fn unique_nib_pairs_v6() {
+        let input = 0x1122334455666788D9AABBCCDDEEFFe5;
+        let actual = order_bits_lexically_for_ord_v(input, ORD_VERSION_BITS6);
+        let expected = 0x11223344556678866aaef3377bbff966 as u128;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn returns_unique_nib_pairs_v7() {
+        let expected = 0x112233445566778899aabbccddeeffe7 as u128;
+        let input = undo_order_bits_lexically_for_ord_v(expected, ORD_VERSION_BITS7);
+        let actual = order_bits_lexically_for_ord_v(input, ORD_VERSION_BITS7);
+        assert_eq!(format!("{:x}", actual), format!("{:x}", expected));
+    }
+
+    #[test]
+    fn unique_nib_pairs_v7() {
+        let input = 0x1122334455667788D9AABBCCDDEEFFe5;
+        let actual = order_bits_lexically_for_ord_v(input, ORD_VERSION_BITS7);
+        let expected = 0x11223344556678866aaef3377bbff967 as u128;
         assert_eq!(actual, expected);
     }
 }
@@ -372,8 +440,7 @@ impl OrdUuidGen {
         let mut bytes = [0 as u8; NUM_NODE_BYTES];
         self.rng.fill_bytes(&mut bytes);
 
-        // `^ (0b101 as u128)` converts the ordered uuid v1 to a v4 uuid with a time based prefix
-        let v = order_bits_lexically_for_v4(Uuid::new_v1(ts, &bytes).as_u128()) ^ (0b101 as u128);
+        let v = order_bits_lexically_for_v4(Uuid::new_v1(ts, &bytes).as_u128());
 
         // note that the LSBs will always be 0b10_0100
         //
@@ -381,6 +448,53 @@ impl OrdUuidGen {
         // which is guaranteed to be set to 10 in v4 of rfc4122
         // the last `0100` bits are from the version field
         // which indicates the uuid version ( obviously 4 in this case )
+        //
+        // these last six bits could be reclaimed and used for another purpose
+        // however that purpose should likely not be to increase the number of
+        // bits used to ensure uniqueness of a uuid node or randomness if the goal
+        // is to simply reorder the bits and remain v4 compatible with simple bit shifts
+
+        OrdUuid(u128_to_bytes(v))
+    }
+
+    pub fn new_v6(&self) -> OrdUuid {
+        // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-01.html#name-uuidv6-layout-and-bit-order
+
+        let ts = Timestamp::now(&self.ctx);
+
+        let v = order_bits_lexically_for_ord_v(
+            Uuid::new_v6(ts, &self.node).as_u128(),
+            ORD_VERSION_BITS6,
+        );
+
+        // note that the LSBs will always be 0b10_0110
+        //
+        // the leading `10` bits are from the variant field
+        // which is guaranteed to be set to 10 in v4 of rfc4122
+        // the last `0110` bits are from the version field
+        // which indicates the uuid version ( obviously 6 in this case )
+        //
+        // these last six bits could be reclaimed and used for another purpose
+        // however that purpose should likely not be to increase the number of
+        // bits used to ensure uniqueness of a uuid node or randomness if the goal
+        // is to simply reorder the bits and remain v4 compatible with simple bit shifts
+
+        OrdUuid(u128_to_bytes(v))
+    }
+
+    pub fn new_v7(&mut self) -> OrdUuid {
+        // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-01.html#name-uuidv6-layout-and-bit-order
+
+        let ts = Timestamp::now(&self.ctx);
+
+        let v = order_bits_lexically_for_ord_v(Uuid::new_v7(ts).as_u128(), ORD_VERSION_BITS7);
+
+        // note that the LSBs will always be 0b10_0111
+        //
+        // the leading `10` bits are from the variant field
+        // which is guaranteed to be set to 10 in v4 of rfc4122
+        // the last `0111` bits are from the version field
+        // which indicates the uuid version ( obviously 7 in this case )
         //
         // these last six bits could be reclaimed and used for another purpose
         // however that purpose should likely not be to increase the number of
@@ -426,45 +540,30 @@ mod test_ord_uuid_gen {
         assert_eq!(0b10_0100, 0x24);
         assert_eq!(v, 0x24);
     }
-}
-
-pub fn new_v4(rng: &mut StdRng) -> OrdUuid {
-    // https://datatracker.ietf.org/doc/html/rfc4122
-
-    let mut bytes = [0 as u8; NUM_BYTES];
-    {
-        rng.fill_bytes(&mut bytes);
-        let b = &mut bytes[NUM_BYTES - 1];
-        *b = (*b & 0xC0) | 0x24;
-    }
-
-    // note that the LSBs will always be 0b10_0100
-    //
-    // the leading `10` bits are from the variant field
-    // which is guaranteed to be set to 10 in v1
-    // the last `0100` bits are from the version field
-    // which indicates the uuid version ( obviously 4 in this case )
-    //
-    // these last six bits could be reclaimed and used for another purpose
-    // however that purpose should likely not be to increase the number of
-    // bits used to ensure uniqueness of a uuid node or randomness if the goal
-    // is to simply reorder the bits and remain v1 compatible with simple bit shifts
-
-    OrdUuid(bytes)
-}
-
-#[cfg(test)]
-mod test_new_v4 {
-    use super::*;
 
     #[test]
-    fn end_in_0b10_0100() {
-        let mut rng = StdRng::from_entropy();
-        let mask = 0x3F;
-
-        let v = new_v4(&mut rng).as_u128() & mask;
-        let expected = 0b10_0100;
-        assert_eq!(expected, 0x24);
+    fn new_v6() {
+        let mask = 0x3FFFFFFFFFFFFF;
+        let oug = OrdUuidGen::new();
+        let v = oug.new_v6().as_u128() & mask;
+        let expected = // node with multicast bit always set, with variant, with version
+            ((oug.node[0] as u128) << 46)
+            | ((oug.node[1] as u128) << 38)
+            | ((oug.node[2] as u128) << 30)
+            | ((oug.node[3] as u128) << 22)
+            | ((oug.node[4] as u128) << 14)
+            | ((oug.node[5] as u128) << 6)
+            | 0x26;
+        assert_eq!(0b10_0110, 0x26);
         assert_eq!(v, expected);
+    }
+
+    #[test]
+    fn new_v7() {
+        let mask = 0x3F;
+        let mut oug = OrdUuidGen::new();
+        let v = oug.new_v7().as_u128() & mask;
+        assert_eq!(0b10_0111, 0x27);
+        assert_eq!(v, 0x27);
     }
 }
