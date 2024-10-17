@@ -432,15 +432,12 @@ impl OrdUuidGen {
         OrdUuid(u128_to_bytes(v))
     }
 
-    pub fn new_v4(&mut self) -> OrdUuid {
+    pub fn new_v4(&self) -> OrdUuid {
         // https://datatracker.ietf.org/doc/html/rfc4122
 
         let ts = Timestamp::now(&self.ctx);
 
-        let mut bytes = [0 as u8; NUM_NODE_BYTES];
-        self.rng.fill_bytes(&mut bytes);
-
-        let v = order_bits_lexically_for_v4(Uuid::new_v1(ts, &bytes).as_u128());
+        let v = order_bits_lexically_for_v4(Uuid::new_v1(ts, &self.node).as_u128());
 
         // note that the LSBs will always be 0b10_0100
         //
@@ -535,10 +532,23 @@ mod test_ord_uuid_gen {
     #[test]
     fn new_v4() {
         let mask = 0x3F;
-        let mut oug = OrdUuidGen::new();
+        let oug = OrdUuidGen::new();
         let v = oug.new_v4().as_u128() & mask;
         assert_eq!(0b10_0100, 0x24);
         assert_eq!(v, 0x24);
+    }
+
+    #[test]
+    fn new_v4_node_reuse() {
+        let mask = 0x3FFFFFFFFFFFFF;
+        let oug = OrdUuidGen::new();
+        let v1 = oug.new_v4().as_u128();
+        let mut v2 = v1;
+        while v1 == v2 {
+            v2 = oug.new_v4().as_u128();
+        }
+        assert_ne!(v1, v2);
+        assert_eq!(v1 & mask, v2 & mask);
     }
 
     #[test]
