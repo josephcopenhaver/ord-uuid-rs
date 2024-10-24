@@ -1,0 +1,27 @@
+name: Test Library
+on:
+  push:
+  schedule:
+    - cron: "35 11 * * 0" # INIT_CRON_EXPRESSION: echo "$(((RANDOM%60))) $(((RANDOM%24)))"' * * '"$( if [[ $(((RANDOM%2))) -eq 0 ]]; then echo 0; else echo 6; fi )"
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - beta
+          - nightly
+    steps:
+      - name: check out the repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.schedule && 'main' || github.ref }}
+      - name: install cargo
+        run: |
+          rustup update ${{ matrix.toolchain }}
+          rustup default ${{ matrix.toolchain }}
+      - name: run tests via cargo
+        run: cargo test --verbose
