@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Debug, Display, Formatter, Result};
 
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use uuid::{Context, Timestamp, Uuid};
@@ -15,7 +15,165 @@ const ORD_VERSION_BITS7: OrdVersionBits = 7;
 // https://www.percona.com/blog/store-uuid-optimized-way/
 //
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct OrdUuid([u8; NUM_BYTES]);
+
+impl Debug for OrdUuid {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "OrdUuid({})", self)
+    }
+}
+
+#[cfg(test)]
+mod test_equality {
+    use super::*;
+
+    #[test]
+    fn lsb_diff() {
+        let mut v1 = [0; NUM_BYTES];
+        v1[NUM_BYTES-1] = 1;
+        let mut v2 = [0; NUM_BYTES];
+        v2[NUM_BYTES-1] = 2;
+        let v1 = OrdUuid(v1);
+        let v2 = OrdUuid(v2);
+        assert_ne!(v1, v2);
+    }
+
+    #[test]
+    fn msb_diff() {
+        let mut v1 = [0; NUM_BYTES];
+        v1[0] = 1;
+        let mut v2 = [0; NUM_BYTES];
+        v2[0] = 2;
+        let v1 = OrdUuid(v1);
+        let v2 = OrdUuid(v2);
+        assert_ne!(v1, v2);
+    }
+
+    #[test]
+    fn lsb_msb_diff() {
+        let mut v1 = [0; NUM_BYTES];
+        v1[NUM_BYTES-1] = 1;
+        let mut v2 = [0; NUM_BYTES];
+        v2[0] = 1;
+        let v1 = OrdUuid(v1);
+        let v2 = OrdUuid(v2);
+        assert_ne!(v1, v2);
+    }
+
+    #[test]
+    fn zero_and_v6() {
+        let g = OrdUuidGen::new();
+        let v1 = OrdUuid([0; NUM_BYTES]);
+        let v2 = OrdUuid([0; NUM_BYTES]);
+        assert_eq!(v1, v2);
+        assert_eq!(v1 == v2, true);
+        assert_eq!(
+            format!("{:?}", v1),
+            "OrdUuid(00000000000000000000000000000000)"
+        );
+        let t1 = g.new_v6();
+        assert_ne!(t1, v2);
+        let t2 = g.new_v6();
+        assert_ne!(t2, v2);
+        assert_ne!(t1, t2);
+        let v = g.new_v6();
+        assert_eq!(format!("OrdUuid({})", format!("{}", v)), format!("{:?}", v));
+    }
+}
+
+#[cfg(test)]
+mod test_ordering {
+    use super::*;
+
+    #[test]
+    fn lsb_diff() {
+        let mut v1 = [0; NUM_BYTES];
+        v1[NUM_BYTES-1] = 1;
+        let mut v2 = [0; NUM_BYTES];
+        v2[NUM_BYTES-1] = 2;
+        let v1 = OrdUuid(v1);
+        let v2 = OrdUuid(v2);
+        assert_ne!(v1, v2);
+        assert_eq!(v1 < v2, true);
+        assert_eq!(v1 > v2, false);
+        assert_eq!(v1 == v2, false);
+        let set = [v1.clone(), v2.clone()];
+        assert_eq!(set.iter().min(), Some(&v1.clone()));
+        assert_eq!(set.iter().max(), Some(&v2.clone()));
+        let set = [v2.clone(), v1.clone()];
+        assert_eq!(set.iter().min(), Some(&v1.clone()));
+        assert_eq!(set.iter().max(), Some(&v2.clone()));
+    }
+
+    #[test]
+    fn msb_diff() {
+        let mut v1 = [0; NUM_BYTES];
+        v1[0] = 1;
+        let mut v2 = [0; NUM_BYTES];
+        v2[0] = 2;
+        let v1 = OrdUuid(v1);
+        let v2 = OrdUuid(v2);
+        assert_ne!(v1, v2);
+        assert_eq!(v1 < v2, true);
+        assert_eq!(v1 > v2, false);
+        assert_eq!(v1 == v2, false);
+        let set = [v1.clone(), v2.clone()];
+        assert_eq!(set.iter().min(), Some(&v1.clone()));
+        assert_eq!(set.iter().max(), Some(&v2.clone()));
+        let set = [v2.clone(), v1.clone()];
+        assert_eq!(set.iter().min(), Some(&v1.clone()));
+        assert_eq!(set.iter().max(), Some(&v2.clone()));
+    }
+
+    #[test]
+    fn lsb_msb_diff() {
+        let mut v1 = [0; NUM_BYTES];
+        v1[NUM_BYTES-1] = 1;
+        let mut v2 = [0; NUM_BYTES];
+        v2[0] = 1;
+        let v1 = OrdUuid(v1);
+        let v2 = OrdUuid(v2);
+        assert_ne!(v1, v2);
+        assert_eq!(v1 < v2, true);
+        assert_eq!(v1 > v2, false);
+        assert_eq!(v1 == v2, false);
+        let set = [v1.clone(), v2.clone()];
+        assert_eq!(set.iter().min(), Some(&v1.clone()));
+        assert_eq!(set.iter().max(), Some(&v2.clone()));
+        let set = [v2.clone(), v1.clone()];
+        assert_eq!(set.iter().min(), Some(&v1.clone()));
+        assert_eq!(set.iter().max(), Some(&v2.clone()));
+    }
+
+    #[test]
+    fn zero() {
+        // verify zero value case
+        {
+            let v1 = OrdUuid([0; NUM_BYTES]);
+            let v2 = OrdUuid([0; NUM_BYTES]);
+            assert_eq!(v1 > v2, false);
+            assert_eq!(v1 < v2, false);
+            assert_eq!(v1 == v2, true);
+        }
+
+        // verify v6 case
+        {
+            let g = OrdUuidGen::new();
+            let v1 = g.new_v6();
+            let v2 = g.new_v6();
+            assert_eq!(v1 > v2, false);
+            assert_eq!(v1 < v2, true);
+            assert_eq!(v1 == v2, false);
+            let set = [v1.clone(), v2.clone()];
+            assert_eq!(set.iter().min(), Some(&v1.clone()));
+            assert_eq!(set.iter().max(), Some(&v2.clone()));
+            let set = [v2.clone(), v1.clone()];
+            assert_eq!(set.iter().min(), Some(&v1.clone()));
+            assert_eq!(set.iter().max(), Some(&v2.clone()));
+        }
+    }
+}
 
 impl OrdUuid {
     fn as_u128(&self) -> u128 {
