@@ -31,9 +31,9 @@ mod test_equality {
     #[test]
     fn lsb_diff() {
         let mut v1 = [0; NUM_BYTES];
-        v1[NUM_BYTES-1] = 1;
+        v1[NUM_BYTES - 1] = 1;
         let mut v2 = [0; NUM_BYTES];
-        v2[NUM_BYTES-1] = 2;
+        v2[NUM_BYTES - 1] = 2;
         let v1 = OrdUuid(v1);
         let v2 = OrdUuid(v2);
         assert_ne!(v1, v2);
@@ -53,7 +53,7 @@ mod test_equality {
     #[test]
     fn lsb_msb_diff() {
         let mut v1 = [0; NUM_BYTES];
-        v1[NUM_BYTES-1] = 1;
+        v1[NUM_BYTES - 1] = 1;
         let mut v2 = [0; NUM_BYTES];
         v2[0] = 1;
         let v1 = OrdUuid(v1);
@@ -89,9 +89,9 @@ mod test_ordering {
     #[test]
     fn lsb_diff() {
         let mut v1 = [0; NUM_BYTES];
-        v1[NUM_BYTES-1] = 1;
+        v1[NUM_BYTES - 1] = 1;
         let mut v2 = [0; NUM_BYTES];
-        v2[NUM_BYTES-1] = 2;
+        v2[NUM_BYTES - 1] = 2;
         let v1 = OrdUuid(v1);
         let v2 = OrdUuid(v2);
         assert_ne!(v1, v2);
@@ -129,7 +129,7 @@ mod test_ordering {
     #[test]
     fn lsb_msb_diff() {
         let mut v1 = [0; NUM_BYTES];
-        v1[NUM_BYTES-1] = 1;
+        v1[NUM_BYTES - 1] = 1;
         let mut v2 = [0; NUM_BYTES];
         v2[0] = 1;
         let v1 = OrdUuid(v1);
@@ -279,13 +279,21 @@ fn order_bits_lexically_for_v1(v: u128) -> u128 {
     | ((v & (0xFFFFFFFF << 96)) >> 28)
     // 0xFFFFFFFFFFFFFFF00000
     //
-    // move clock seq high and low bits, leaving variants bits prefix behind
-    // 0x00000000000000003FFF
-    | ((v & (0x3FFF << 48) ) << 6)
-    // 0xFFFFFFFFFFFFFFFFFFC0
+    // // move clock seq high and low bits, leaving variants bits prefix behind
+    // // 0x00000000000000003FFF
+    // | ((v & (0x3FFF << 48) ) << 6)
+    // // 0xFFFFFFFFFFFFFFFFFFC0
+    // //
+    // // preserve node bits with multicast bit moved to end
+    // | ((v & (0xFE << 40)) << 6)
     //
-    // preserve node bits with multicast bit moved to end
-    | ((v & (0xFE << 40)) << 6)
+    // combine the above blocks
+    // moves clock seq bits without variant bits prefix
+    // also move first byte of node without last multicast bit
+    | ((v & (0x3FFFFE << 40) ) << 6)
+    //
+    // rest of node (5 bytes)
+    //
     | ((v & 0xFFFFFFFFFF) << 7)
     // | ((v & (1 << 40)) >> 34)
     // not using the above as this is for v1
@@ -313,10 +321,9 @@ mod test_order_bits_lexically_for_v1 {
         | ((v >> 20) & (0xFFFF << 80))
         // time low
         | ((v << 28) & (0xFFFFFFFF << 96))
-        // clock seq
-        | ((v >> 6) & (0x3FFF << 48))
-        // node
-        | ((v >> 6) & (0xFE << 40))
+        // clock seq and first byte of node
+        | ((v >> 6) & (0x3FFFFE << 40))
+        // rest of node (5 bytes)
         | ((v >> 7) & 0xFFFFFFFFFF)
         | ((v << 34) & (1 << 40))
         // variant
@@ -359,13 +366,17 @@ fn order_bits_lexically_for_v4(v: u128) -> u128 {
     | ((v & (0xFFFFFFFF << 96)) >> 28)
     // 0xFFFFFFFFFFFFFFF00000
     //
-    // move clock seq high and low bits, leaving variants bits prefix behind
-    // 0x00000000000000003FFF
-    | ((v & (0x3FFF << 48) ) << 6)
-    // 0xFFFFFFFFFFFFFFFFFFC0
+    // // move clock seq high and low bits, leaving variants bits prefix behind
+    // // 0x00000000000000003FFF
+    // | ((v & (0x3FFF << 48) ) << 6)
+    // // 0xFFFFFFFFFFFFFFFFFFC0
+    // //
+    // // preserve node bits
+    // | ((v & 0xFFFFFFFFFFFF) << 6)
     //
-    // preserve node bits
-    | ((v & 0xFFFFFFFFFFFF) << 6)
+    // combine the above blocks
+    // moves clock seq bits without variant bits prefix
+    | ((v & 0x3FFF_FFFFFFFFFFFF) << 6)
     //
     // set variant and version bits
     | 0x24
@@ -382,10 +393,8 @@ mod test_order_bits_lexically_for_v4 {
         | ((v >> 20) & (0xFFFF << 80))
         // time low
         | ((v << 28) & (0xFFFFFFFF << 96))
-        // clock seq
-        | ((v >> 6) & (0x3FFF << 48))
-        // node
-        | ((v >> 6) & 0xFFFFFFFFFFFF)
+        // clock seq and node
+        | ((v >> 6) & 0x3FFF_FFFFFFFFFFFF)
         // variant
         | ((v << 58) & (0xC << 60))
         // version
@@ -439,7 +448,7 @@ mod test_order_bits_lexically_for_ord_v {
         // time low
         | ((v >> 4) & (0xFFF << 64))
         // clock seq and node bits
-        | ((v >> 6) & 0x3FFFFFFFFFFFFFFF)
+        | ((v >> 6) & 0x3FFF_FFFFFFFFFFFF)
         // variant
         | ((v << 58) & (0xC << 60))
         // version
