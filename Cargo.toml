@@ -8,4 +8,4 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
-uuid = { version = "1.10.0", features = ["v1", "fast-rng", "macro-diagnostics", "v6", "v7"] }
+uuid = { version = "1.11.1", features = ["v1", "fast-rng", "macro-diagnostics", "v6", "v7"] }
