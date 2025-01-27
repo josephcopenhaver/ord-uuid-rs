@@ -559,7 +559,7 @@ mod test_u128_to_bytes {
 impl OrdUuidGen {
     pub fn new() -> Self {
         let mut node = [0; NUM_NODE_BYTES];
-        let mut rng = StdRng::from_entropy();
+        let mut rng = StdRng::from_os_rng();
         let seed = rng.next_u32() as u16;
         rng.fill_bytes(&mut node);
 
