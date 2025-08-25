@@ -3,9 +3,15 @@ name = "ord-uuid"
 repository = "https://github.com/josephcopenhaver/ord-uuid-rs"
 description = "Creates lexically sortable uuid values of size 16 bytes."
 license = "MIT"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 
 [dependencies]
 rand = "0.9.2"
-uuid = { version = "1.17.0", features = ["v1", "fast-rng", "macro-diagnostics", "v6", "v7"] }
+uuid = { version = "1.17.0", features = [
+    "v1",
+    "fast-rng",
+    "macro-diagnostics",
+    "v6",
+    "v7",
+] }
