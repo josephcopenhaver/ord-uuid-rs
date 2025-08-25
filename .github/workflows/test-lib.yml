@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: "35 11 * * 0" # INIT_CRON_EXPRESSION: echo "$(((RANDOM%60))) $(((RANDOM%24)))"' * * '"$( if [[ $(((RANDOM%2))) -eq 0 ]]; then echo 0; else echo 6; fi )"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: test

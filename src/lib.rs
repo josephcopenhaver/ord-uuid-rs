@@ -177,22 +177,7 @@ mod test_ordering {
 
 impl OrdUuid {
     fn as_u128(&self) -> u128 {
-        ((self.0[0] as u128) << 120)
-            | ((self.0[1] as u128) << 112)
-            | ((self.0[2] as u128) << 104)
-            | ((self.0[3] as u128) << 96)
-            | ((self.0[4] as u128) << 88)
-            | ((self.0[5] as u128) << 80)
-            | ((self.0[6] as u128) << 72)
-            | ((self.0[7] as u128) << 64)
-            | ((self.0[8] as u128) << 56)
-            | ((self.0[9] as u128) << 48)
-            | ((self.0[10] as u128) << 40)
-            | ((self.0[11] as u128) << 32)
-            | ((self.0[12] as u128) << 24)
-            | ((self.0[13] as u128) << 16)
-            | ((self.0[14] as u128) << 8)
-            | self.0[15] as u128
+        u128::from_be_bytes(self.0)
     }
 
     pub fn as_bytes(&self) -> [u8; NUM_BYTES] {
@@ -489,24 +474,7 @@ mod test_order_bits_lexically_for_ord_v {
 }
 
 fn u128_to_bytes(v: u128) -> [u8; NUM_BYTES] {
-    [
-        (v >> 120) as u8,
-        (v >> 112) as u8,
-        (v >> 104) as u8,
-        (v >> 96) as u8,
-        (v >> 88) as u8,
-        (v >> 80) as u8,
-        (v >> 72) as u8,
-        (v >> 64) as u8,
-        (v >> 56) as u8,
-        (v >> 48) as u8,
-        (v >> 40) as u8,
-        (v >> 32) as u8,
-        (v >> 24) as u8,
-        (v >> 16) as u8,
-        (v >> 8) as u8,
-        v as u8,
-    ]
+    v.to_be_bytes()
 }
 
 #[cfg(test)]
