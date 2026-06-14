@@ -1,7 +1,8 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
-use rand::{rngs::StdRng, RngCore, SeedableRng};
-use uuid::{Context, Timestamp, Uuid};
+use rand::rngs::{StdRng, SysRng};
+use rand::{Rng, SeedableRng};
+use uuid::{ContextV1, Timestamp, Uuid};
 
 const NUM_BYTES: usize = 16;
 const NUM_NODE_BYTES: usize = 6;
@@ -20,7 +21,7 @@ pub struct OrdUuid([u8; NUM_BYTES]);
 
 impl Debug for OrdUuid {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "OrdUuid({})", self)
+        write!(f, "OrdUuid({self})")
     }
 }
 
@@ -243,7 +244,7 @@ mod test_ord_uuid_x_fmt {
 }
 
 pub struct OrdUuidGen {
-    ctx: Context,
+    ctx: ContextV1,
     node: [u8; NUM_NODE_BYTES],
 }
 
@@ -524,15 +525,22 @@ mod test_u128_to_bytes {
     }
 }
 
+impl Default for OrdUuidGen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OrdUuidGen {
     pub fn new() -> Self {
         let mut node = [0; NUM_NODE_BYTES];
-        let mut rng = StdRng::from_os_rng();
+        let mut rng =
+            StdRng::try_from_rng(&mut SysRng).expect("failed to seed StdRng from OS entropy");
         let seed = rng.next_u32() as u16;
         rng.fill_bytes(&mut node);
 
         OrdUuidGen {
-            ctx: Context::new(seed),
+            ctx: ContextV1::new(seed),
             node: node,
         }
     }
